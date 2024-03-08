@@ -33,37 +33,49 @@ fs.readdir(logDirectory, (err, files) => {
             let workbook = new ExcelJS.Workbook();
             let worksheet = workbook.addWorksheet('SMS Data');
             worksheet.columns = [
+                { header: 'Date', key: 'date', width: 20 },
                 { header: 'TXN ID', key: 'txnId', width: 25 },
+                { header: 'Status Code', key: 'statusCode', width: 15 },
                 { header: 'MSISDN', key: 'msisdn', width: 15 },
                 { header: 'Bill MSISDN', key: 'billMsisdn', width: 15 },
                 { header: 'CLI', key: 'cli', width: 15 },
                 { header: 'Message', key: 'message', width: 50 }
             ];
-            let count = 0;
+
+            let storedDate = null;
+            const dateRegex = /Date:"(.*?)"/;
+
             // Process each line to find relevant data
             lines.forEach((line) => {
                 const txnIdMatch = line.match(/TXN ID: (\S+),/);
                 const requestBodyMatch = line.match(/requestBody: ({.*}),/);
                 const statusCodeMatch = line.match(/statusCode=(\d+)/);
 
+
+                // Check if the line contains the date
+                const dateMatch = line.match(dateRegex);
+                if (dateMatch) {
+                    storedDate = new Date(dateMatch[1]).toISOString();
+                }
+
+
                 if (txnIdMatch && requestBodyMatch) {
                     storedRequestBody = JSON.parse(requestBodyMatch[1]);
                 }
 
-                if (!statusCodeMatch) {
-                    count++;
-                }
 
                 if (txnIdMatch && statusCodeMatch && statusCodeMatch[1] === '1000' && storedRequestBody) {
                     worksheet.addRow({
+                        date: storedDate,
                         txnId: txnIdMatch[1],
+                        statusCode: statusCodeMatch[1],
                         msisdn: storedRequestBody.msisdnList[0],
                         billMsisdn: storedRequestBody.billMsisdn,
                         cli: storedRequestBody.cli,
                         message: storedRequestBody.message
                     });
                 }
-                console.log("Total count: " + count);
+
             });
 
             // Write to an Excel file
