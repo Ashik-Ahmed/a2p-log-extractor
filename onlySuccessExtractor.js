@@ -39,6 +39,9 @@ fs.readdir(logDirectory, (err, files) => {
                 { header: 'MSISDN', key: 'msisdn', width: 15 },
                 { header: 'Bill MSISDN', key: 'billMsisdn', width: 15 },
                 { header: 'CLI', key: 'cli', width: 15 },
+                { header: 'Type', key: 'messageType', width: 15 },
+                { header: 'Character count', key: 'characterCount', width: 15 },
+                { header: 'Message count', key: 'messageCount', width: 15 },
                 { header: 'Message', key: 'message', width: 50 }
             ];
 
@@ -72,10 +75,12 @@ fs.readdir(logDirectory, (err, files) => {
                         msisdn: storedRequestBody.msisdnList[0],
                         billMsisdn: storedRequestBody.billMsisdn,
                         cli: storedRequestBody.cli,
+                        messageType: storedRequestBody.messageType,
+                        characterCount: storedRequestBody.message.length,
+                        messageCount: messageType == "1" ? (storedRequestBody.message.length <= 160 ? 1 : Math.ceil((storedRequestBody.message.length - 160) / 156) + 1) : storedRequestBody.message.length <= 70 ? 1 : Math.ceil((storedRequestBody.message.length - 70) / 67) + 1,
                         message: storedRequestBody.message
                     });
                 }
-
             });
 
             // Write to an Excel file
