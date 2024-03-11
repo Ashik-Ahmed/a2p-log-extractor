@@ -18,6 +18,7 @@ fs.readdir(logDirectory, (err, files) => {
 
     files.forEach((file) => {
         const filePath = path.join(logDirectory, file);
+        console.log('Reading file:', filePath);
         // Read the log file
         fs.readFile(filePath, 'utf-8', (err, data) => {
             if (err) {
@@ -44,6 +45,28 @@ fs.readdir(logDirectory, (err, files) => {
                 { header: 'Message count', key: 'messageCount', width: 15 },
                 { header: 'Message', key: 'message', width: 50 }
             ];
+
+            // Add a header row with custom text
+            const headerRowNumber = 1;
+            const headerText = "A2P SMS Report"; // Replace with your desired header text
+            worksheet.mergeCells(headerRowNumber, 1, headerRowNumber, worksheet.columns.length); // Merge cells for the header
+            const headerRow = worksheet.getRow(1);
+            headerRow.getCell(1).value = headerText;
+            headerRow.getCell(1).font = { bold: true, size: 14 }; // Style the header as needed
+            headerRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+            const headerRow2Number = worksheet.getRow(2);
+            const header2Text = filePath.includes("iptsp") ? "IPTSP SMS Report" : "MNO SMS Report";
+            // worksheet.mergeCells(headerRow2Number, 2, headerRow2Number, worksheet.columns.length); // Merge cells for the header
+            const headerRow2 = worksheet.getRow(2);
+            headerRow2.getCell(1).value = header2Text;
+            headerRow2.getCell(1).font = { bold: true, size: 10 }; // Style the header as needed
+            headerRow2.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+
+            // Ensure that data starts from the next row after the header
+            const dataStartRow = headerRow2Number + 2; // Adjust the header row number as needed
+
 
             let storedDate = null;
             const dateRegex = /Date:"(.*?)"/;
@@ -77,9 +100,9 @@ fs.readdir(logDirectory, (err, files) => {
                         cli: storedRequestBody.cli,
                         messageType: storedRequestBody.messageType,
                         characterCount: storedRequestBody.message.length,
-                        messageCount: messageType == "1" ? (storedRequestBody.message.length <= 160 ? 1 : Math.ceil((storedRequestBody.message.length - 160) / 156) + 1) : storedRequestBody.message.length <= 70 ? 1 : Math.ceil((storedRequestBody.message.length - 70) / 67) + 1,
+                        messageCount: storedRequestBody.messageType == "1" ? (storedRequestBody.message.length <= 160 ? 1 : Math.ceil((storedRequestBody.message.length - 160) / 15) + 1) : storedRequestBody.message.length <= 70 ? 1 : Math.ceil((storedRequestBody.message.length - 70) / 67) + 1,
                         message: storedRequestBody.message
-                    });
+                    }, dataStartRow);
                 }
             });
 
