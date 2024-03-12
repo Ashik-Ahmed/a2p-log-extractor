@@ -65,7 +65,7 @@ fs.readdir(logDirectory, (err, files) => {
 
 
             // Ensure that data starts from the next row after the header
-            const dataStartRow = headerRow2Number + 2; // Adjust the header row number as needed
+            const dataStartRow = headerRow2Number + 3; // Adjust the header row number as needed
 
 
             let storedDate = null;
