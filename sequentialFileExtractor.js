@@ -4,8 +4,8 @@ const ExcelJS = require('exceljs');
 const readline = require('readline');
 const util = require('util');
 
-const logDirectory = '/home/obaydul/a2plogs/iptsp_01-29Feb';
-const outputDirectory = '/home/obaydul/a2plogs/report_february-2024/iptsp_February';
+const logDirectory = './logs';
+const outputDirectory = './output';
 
 // Ensure output directory exists
 if (!fs.existsSync(outputDirectory)) {
@@ -34,13 +34,15 @@ async function processFiles() {
             // Define the columns for the worksheet
             worksheet.columns = [
                 // Define your columns here
+                { header: 'Transaction ID', key: 'txnId', width: 25 },
                 { header: 'MSISDN', key: 'msisdn', width: 15 },
+                { header: 'Operator', key: 'operator', width: 15 },
                 { header: 'Bill MSISDN', key: 'billMsisdn', width: 15 },
                 { header: 'CLI', key: 'cli', width: 15 },
                 { header: 'Type', key: 'messageType', width: 15 },
                 { header: 'Character count', key: 'characterCount', width: 15 },
                 { header: 'Message count', key: 'messageCount', width: 15 },
-                { header: 'Message', key: 'message', width: 50 }
+                // { header: 'Message', key: 'message', width: 50 }
             ];
 
             // Your logic to add rows to worksheet
@@ -63,8 +65,8 @@ async function processFiles() {
                 const txnIdMatch = line.match(/TXN ID: (\S+),/);
                 const requestBodyMatch = line.match(/requestBody: ({.*}),/);
                 const statusCodeMatch = line.match(/statusCode=(\d+)/);
-
-                // ... other matching and processing logic ...
+                // const dippingResponseMatch = line.match(/dipping response:.+operator=(\S+),/);
+                const dippingResponseMatch = line.match(/dipping response:.+?operator=(\S+?)\),/);
 
                 // Check if the line contains the date
                 const dateMatch = line.match(dateRegex);
@@ -77,21 +79,30 @@ async function processFiles() {
                     storedRequestBody = JSON.parse(requestBodyMatch[1]);
                 }
 
+                if (dippingResponseMatch) {
+                    var operatorName = dippingResponseMatch[1];
+                }
+
 
                 // Add rows to worksheet only if the criteria are met
                 if (txnIdMatch && statusCodeMatch && statusCodeMatch[1] === '1000' && storedRequestBody) {
 
+                    // if (!storedRequestBody?.msisdnList) {
+                    //     console.log(storedRequestBody.msisdnList);
+                    // }
+
                     worksheet.addRow({
                         // date: storedDate,
-                        // txnId: txnIdMatch[1],
+                        txnId: txnIdMatch[1],
                         // statusCode: statusCodeMatch[1],
-                        msisdn: storedRequestBody?.msisdnList[0] || 'no msisdn found',
+                        msisdn: storedRequestBody?.msisdnList || 'no msisdn found',
+                        operator: operatorName || 'no operator',
                         billMsisdn: storedRequestBody?.billMsisdn || 'no billmsisdn',
                         cli: storedRequestBody?.cli || 'no cli',
                         messageType: storedRequestBody?.messageType || 'no messageType',
                         characterCount: storedRequestBody?.message?.length || 'no length',
                         messageCount: storedRequestBody?.messageType == "1" ? (storedRequestBody?.message?.length <= 160 ? 1 : Math.ceil((storedRequestBody?.message?.length - 160) / 15) + 1) : storedRequestBody?.message?.length <= 70 ? 1 : Math.ceil((storedRequestBody?.message?.length - 70) / 67) + 1,
-                        message: storedRequestBody?.message
+                        // message: storedRequestBody?.message
                     }, dataStartRow);
                 }
             }
