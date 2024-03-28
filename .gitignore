@@ -3,6 +3,7 @@
 # folders containing files
 /logs
 /output
+/promo-logs
 
 # dependencies
 /node_modules
