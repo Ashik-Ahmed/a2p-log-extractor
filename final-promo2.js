@@ -3,7 +3,7 @@ const readline = require('readline');
 const Excel = require('exceljs');
 
 const logDirectory = './promo-logs'; // Replace with your log directory path
-const outputExcelFile = 'promo-output.xlsx';
+const outputExcelFile = 'promo-output2.xlsx';
 
 // Function to process log file
 const processLogFile = async (filePath) => {
@@ -55,90 +55,58 @@ const processLogFile = async (filePath) => {
     return dataMap;
 };
 
-
 const writeToExcel = async (dataMap) => {
     const workbook = new Excel.Workbook();
-    // const worksheet = workbook.addWorksheet('Promotional Data');
-    const campaignWorksheets = {};
-
-    // First pass to find all unique RN Codes and organize data by Campaign ID
+    const worksheet = workbook.addWorksheet('Promotional Data');
     const campaignData = {};
+
+    // Aggregating data for each campaign
     for (const data of dataMap.values()) {
-        const { campaignId, rnCodeCounts } = data;
+        const { clientId, campaignId, rnCodeCounts } = data;
         if (!campaignData[campaignId]) {
             campaignData[campaignId] = {
-                rnCodes: new Set(),
-                rows: []
+                clientId,
+                rnCodeCounts: {}
             };
         }
-        if (rnCodeCounts) { // Check if rnCodeCounts is not null or undefined
-            Object.keys(rnCodeCounts).forEach(rnCode => {
-                campaignData[campaignId].rnCodes.add(rnCode);
-            });
+        // Summing rn_code counts for each campaign
+        if (rnCodeCounts) {
+            for (const rnCode in rnCodeCounts) {
+                if (!campaignData[campaignId].rnCodeCounts[rnCode]) {
+                    campaignData[campaignId].rnCodeCounts[rnCode] = 0;
+                }
+                campaignData[campaignId].rnCodeCounts[rnCode] += rnCodeCounts[rnCode];
+            }
         }
-        campaignData[campaignId].rows.push(data);
     }
-    // Create worksheets with dynamic columns
-    for (const [campaignId, { rnCodes, rows }] of Object.entries(campaignData)) {
-        const worksheet = workbook.addWorksheet(`Campaign ${campaignId}`);
-        const rnCodeHeaders = Array.from(rnCodes).sort().map(rnCode => ({
-            header: `RN Code ${rnCode}`,
-            key: rnCode,
-            width: 15
-        }));
-        worksheet.columns = [
-            { header: 'TXN ID', key: 'txnId', width: 20 },
-            { header: 'Client ID', key: 'clientId', width: 15 },
-            { header: 'Campaign ID', key: 'campaignId', width: 20 },
-            ...rnCodeHeaders
-        ];
 
-        // Add rows to each worksheet
-        rows.forEach(({ txnId, clientId, rnCodeCounts = {} }) => {
-            const row = { txnId, clientId, campaignId };
-            rnCodeHeaders.forEach(({ key }) => {
-                row[key] = rnCodeCounts[key] || 0;
-            });
-            worksheet.addRow(row);
+    // Getting all unique RN Codes across campaigns
+    const allRnCodes = new Set();
+    Object.values(campaignData).forEach(({ rnCodeCounts }) => {
+        Object.keys(rnCodeCounts).forEach(rnCode => allRnCodes.add(rnCode));
+    });
+
+    const rnCodeHeaders = Array.from(allRnCodes).sort().map(rnCode => ({
+        header: `RN Code ${rnCode}`,
+        key: rnCode,
+        width: 15
+    }));
+
+    // Setting worksheet headers
+    worksheet.columns = [
+        { header: 'Client ID', key: 'clientId', width: 15 },
+        { header: 'Campaign ID', key: 'campaignId', width: 20 },
+        ...rnCodeHeaders
+    ];
+
+    // Adding rows to the worksheet
+    for (const [campaignId, { clientId, rnCodeCounts }] of Object.entries(campaignData)) {
+        const row = { clientId, campaignId };
+        rnCodeHeaders.forEach(({ key }) => {
+            row[key] = rnCodeCounts[key] || 0;
         });
-
-        campaignWorksheets[campaignId] = worksheet;
+        worksheet.addRow(row);
     }
-
-
-    // worksheet.columns = [
-    //     { header: 'TXN ID', key: 'txnId', width: 20 },
-    //     { header: 'Client ID', key: 'clientId', width: 15 },
-    //     { header: 'Campaign ID', key: 'campaignId', width: 20 },
-    //     // { header: 'MSISDN', key: 'msisdn', width: 20 },
-    //     { header: 'RN Code', key: 'rn_code', width: 10 },
-    //     // { header: 'Type', key: 'type', width: 10 },
-    //     { header: 'MSISDN Count', key: 'msisdnCount', width: 15 } // Adding MSISDN Count column
-    // ];
-
-    // for (const [txnId, data] of dataMap.entries()) {
-    //     if (data.rnCodeCounts) {
-    //         for (const [rnCode, count] of Object.entries(data.rnCodeCounts)) {
-    //             worksheet.addRow({
-    //                 txnId,
-    //                 clientId: data.clientId,
-    //                 campaignId: data.campaignId,
-    //                 rn_code: rnCode,
-    //                 msisdnCount: count
-    //             });
-    //         }
-    //     } else {
-    //         // Handle cases where there are no RN Code counts
-    //         worksheet.addRow({
-    //             txnId,
-    //             clientId: data.clientId,
-    //             campaignId: data.campaignId,
-    //             rn_code: 'N/A',
-    //             msisdnCount: 0
-    //         });
-    //     }
-
-    // }
 
     await workbook.xlsx.writeFile(outputExcelFile);
     console.log(`Data has been written to ${outputExcelFile}`);

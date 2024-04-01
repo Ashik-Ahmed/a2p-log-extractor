@@ -5,6 +5,7 @@
 /output
 /promo-logs
 promo-output.xlsx
+promo-output2.xlsx
 
 # dependencies
 /node_modules
