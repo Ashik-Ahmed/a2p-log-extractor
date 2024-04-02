@@ -31,10 +31,13 @@ const processLogFile = async (filePath) => {
             txnId = message.clientTxnId;
             if (txnId && !dataMap.has(txnId)) {
                 // console.log(`TXN_ID: ${txnId}`, `dataMap: ${dataMap}`);
-                dataMap.set(txnId, { clientId: message.clientId, campaignId: message.campaignId, records: [] });
+                dataMap.set(txnId, { clientId: message.clientId, campaignId: message.campaignId, msisdnCount: message.msisdnList.length, records: [] });
             }
         } else if (line.includes('AnsIptspPstnRequestDto') && txnId) {
             const requestDto = JSON.parse(line.split('AnsIptspPstnRequestDto: ')[1]);
+            const messageLength = requestDto.message.length;
+            const messageType = requestDto.type;
+            const messageCount = messageType == "1" ? (messageLength <= 160 ? 1 : Math.ceil((messageLength - 160) / 15) + 1) : messageLength <= 70 ? 1 : Math.ceil((messageLength - 70) / 67) + 1;
             const msisdns = requestDto.msisdn.split(','); // Assuming msisdn field is a string with MSISDNs separated by commas
             const rnCode = requestDto.rn_code;
             const data = dataMap.get(txnId);
@@ -49,9 +52,14 @@ const processLogFile = async (filePath) => {
                 }
                 const count = data.rnCodeCounts[rnCode] || 0;
                 data.rnCodeCounts[rnCode] = count + msisdns.length;
+                data.messageLength = messageLength;
+                data.messageType = messageType;
+                data.messageCount = messageCount;
             }
         }
     }
+
+    // console.log(dataMap);
     return dataMap;
 };
 
@@ -62,10 +70,15 @@ const writeToExcel = async (dataMap) => {
 
     // Aggregating data for each campaign
     for (const data of dataMap.values()) {
-        const { clientId, campaignId, rnCodeCounts } = data;
+        // console.log(data);
+        const { clientId, campaignId, rnCodeCounts, messageLength, messageType, messageCount } = data;
         if (!campaignData[campaignId]) {
             campaignData[campaignId] = {
                 clientId,
+                campaignId,
+                messageLength,
+                messageType,
+                messageCount,
                 rnCodeCounts: {}
             };
         }
@@ -96,15 +109,31 @@ const writeToExcel = async (dataMap) => {
     worksheet.columns = [
         { header: 'Client ID', key: 'clientId', width: 15 },
         { header: 'Campaign ID', key: 'campaignId', width: 20 },
+        { header: 'Message Length', key: 'messageLength', width: 15 },
+        { header: 'Message Type', key: 'messageType', width: 15 },
+        { header: 'Message Count', key: 'messageCount', width: 15 },
+        { header: 'Total MSISDN', key: 'totalRnCodeCount', width: 20 }, // New column for total RN code count
+        { header: 'Total Message', key: 'totalMessage', width: 20 },
         ...rnCodeHeaders
     ];
 
     // Adding rows to the worksheet
-    for (const [campaignId, { clientId, rnCodeCounts }] of Object.entries(campaignData)) {
-        const row = { clientId, campaignId };
+    for (const [campaignId, { clientId, rnCodeCounts, messageLength, messageType, messageCount }] of Object.entries(campaignData)) {
+        const row = { clientId, campaignId, messageLength: messageLength || 0, messageType: messageType || 0, messageCount: messageCount || 0 };
+
+        let sumRnCodeCounts = 0; // Initialize sum of RN code counts
+        let totalMessageCount = 0
+
         rnCodeHeaders.forEach(({ key }) => {
-            row[key] = rnCodeCounts[key] || 0;
+            const count = rnCodeCounts[key] || 0;
+            row[key] = count;
+            sumRnCodeCounts += count; // Add to the sum
         });
+
+        row.totalRnCodeCount = sumRnCodeCounts; // Set the total RN code count for the row
+
+        totalMessageCount = messageCount * sumRnCodeCounts;
+        row.totalMessage = totalMessageCount;
         worksheet.addRow(row);
     }
 
