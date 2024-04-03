@@ -3,7 +3,31 @@ const readline = require('readline');
 const Excel = require('exceljs');
 
 const logDirectory = './promo-logs'; // Replace with your log directory path
-const outputExcelFile = 'promo-output2.xlsx';
+const outputExcelFile = 'promo-output-onlySuccess.xlsx';
+
+function transformToValidJSON(dataStr) {
+    // Remove the class type annotations and other non-JSON data like the number at the start.
+    let jsonStr = dataStr.replace(/^\{\d+=|AnsIptspPstnResponsePayload|AnsIptspPstnResponseDto/g, '');
+
+    // Replace '=' with ':' and '()' with '{}'.
+    jsonStr = jsonStr.replace(/=/g, ':').replace(/\(/g, '{').replace(/\)/g, '}');
+
+    // Replace '[]' with '{}'.
+    jsonStr = jsonStr.replace(/\[/g, '{').replace(/\]/g, '}');
+
+    // Add double quotes around keys and string values.
+    jsonStr = jsonStr.replace(/(\w+):/g, '"$1":').replace(/:([a-zA-Z]+)/g, ':"$1"');
+
+    // Handle nested objects and arrays.
+    // This will need to be customized based on the actual structure of your objects.
+
+    try {
+        return JSON.parse(jsonStr);
+    } catch (e) {
+        console.error("Parsing error: ", e);
+        return null;
+    }
+}
 
 // Function to process log file
 const processLogFile = async (filePath) => {
@@ -25,6 +49,33 @@ const processLogFile = async (filePath) => {
                 // console.log(`TXN_ID: ${txnId}`);
             }
         }
+        // Add a new conditional block to process the log line with "rnCode wise IPTSP response"
+        if (line.includes('rnCode wise IPTSP response')) {
+            const rnCodeResponseMatch = line.match(/rnCode wise IPTSP response (\{.*\})/);
+            if (rnCodeResponseMatch && rnCodeResponseMatch[1]) {
+                console.log(rnCodeResponseMatch[1]);
+
+                const rnResponse = transformToValidJSON(rnCodeResponseMatch[1]);
+                console.log(rnResponse);
+                for (const [rnCode, responsePayload] of Object.entries(rnResponse)) {
+                    const statusInfo = responsePayload.statusInfo;
+                    if (statusInfo.statusCode === 1000) {
+                        const messageIDs = statusInfo.messageIDs;
+                        for (const msisdn of Object.keys(messageIDs)) {
+                            const data = dataMap.get(txnId);
+                            if (data) {
+                                if (!data.rnCodeCounts) {
+                                    data.rnCodeCounts = {};
+                                }
+                                const count = data.rnCodeCounts[rnCode] || 0;
+                                data.rnCodeCounts[rnCode] = count + 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (line.includes('Received message from kafka')) {
             // console.log(dataMap.has(txnId), txnId);
             const message = JSON.parse(line.split('Received message from kafka: ')[1]);
