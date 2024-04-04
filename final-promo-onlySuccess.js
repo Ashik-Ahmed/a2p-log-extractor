@@ -5,29 +5,29 @@ const Excel = require('exceljs');
 const logDirectory = './promo-logs'; // Replace with your log directory path
 const outputExcelFile = 'promo-output-onlySuccess.xlsx';
 
-function transformToValidJSON(dataStr) {
-    // Remove the class type annotations and other non-JSON data like the number at the start.
-    let jsonStr = dataStr.replace(/^\{\d+=|AnsIptspPstnResponsePayload|AnsIptspPstnResponseDto/g, '');
+function transformToValidJSON(logLine) {
+    // Extract the JSON-like string between the braces
+    const jsonString = logLine.substring(logLine.indexOf('{') + 1, logLine.lastIndexOf('}'));
 
-    // Replace '=' with ':' and '()' with '{}'.
-    jsonStr = jsonStr.replace(/=/g, ':').replace(/\(/g, '{').replace(/\)/g, '}');
+    // Split the string into key-value pairs
+    const keyValuePairs = jsonString.split(', ');
 
-    // Replace '[]' with '{}'.
-    jsonStr = jsonStr.replace(/\[/g, '{').replace(/\]/g, '}');
-
-    // Add double quotes around keys and string values.
-    jsonStr = jsonStr.replace(/(\w+):/g, '"$1":').replace(/:([a-zA-Z]+)/g, ':"$1"');
-
-    // Handle nested objects and arrays.
-    // This will need to be customized based on the actual structure of your objects.
+    // Construct a JSON object
+    const jsonObject = {};
+    keyValuePairs.forEach(pair => {
+        const [key, value] = pair.split('=');
+        jsonObject[key.trim()] = value.trim();
+    });
 
     try {
-        return JSON.parse(jsonStr);
-    } catch (e) {
-        console.error("Parsing error: ", e);
+        return jsonObject;
+    } catch (error) {
+        console.error('Error parsing JSON:', error);
+        console.error('Invalid JSON string:', jsonString);
         return null;
     }
 }
+
 
 // Function to process log file
 const processLogFile = async (filePath) => {
